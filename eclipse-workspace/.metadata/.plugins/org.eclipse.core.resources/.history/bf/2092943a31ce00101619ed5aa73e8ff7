@@ -1,0 +1,85 @@
+package SEClass;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class SampleJDBC {
+    public static void main(String[] args) {
+        // Database connection details
+        String url = "jdbc:mysql://localhost:3306/school";
+        String user = "root";
+        String password = "521Annadale!";
+        String driverClass = "com.mysql.cj.jdbc.Driver"; 
+
+        Connection connection = null;
+        Statement statement = null;
+        ResultSet resultSet = null;
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            // --- NEW: User Selection Logic ---
+            System.out.println("Select a table to view:");
+            System.out.println("1. patients");
+            System.out.println("2. procedures"); 
+            System.out.println("3. new_events"); 
+            System.out.print("Enter choice (1-3): ");
+            
+            int choice = scanner.nextInt();
+            String tableName = "";
+
+            switch (choice) {
+                case 1: tableName = "patients"; break;
+                case 2: tableName = "procedures"; break;  
+                case 3: tableName = "new_events"; break; 
+                default: 
+                    System.out.println("Invalid selection. Defaulting to 'procedures'.");
+                    tableName = "procedures";
+            }
+
+            String query = "SELECT * FROM " + tableName;
+
+            Class.forName(driverClass);
+            connection = DriverManager.getConnection(url, user, password);
+            System.out.println("Connected to the database. Querying table: " + tableName + "\n");
+
+            statement = connection.createStatement();
+            resultSet = statement.executeQuery(query);
+            
+            //Get Metadata to understand the table structure
+            ResultSetMetaData metaData = resultSet.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            
+            for (int i = 1; i <= columnCount; i++) {
+                System.out.println(metaData.getColumnName(i) + "\t");
+            }
+
+            while (resultSet.next()) {
+                //Iterate through the columns for the current row
+                for (int i = 1; i <= columnCount; i++) {
+                    // getString(i) gets the value at index i (1-based index)
+                    // We use "\t" (tab) to separate columns visually
+                    String value = resultSet.getString(i);
+                    System.out.print(value + "\t");
+                }
+                System.out.println(); 
+            }
+        } catch (ClassNotFoundException e) {
+            System.err.println("Error loading the JDBC driver: " + e.getMessage());
+            e.printStackTrace();
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try {
+                if (resultSet != null) resultSet.close();
+                if (statement != null) statement.close();
+                if (connection != null) connection.close();
+                if (scanner != null) scanner.close();
+                System.out.println("\nConnection closed.");
+            } catch (SQLException e) {
+                System.err.println("Error closing resources: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+}
