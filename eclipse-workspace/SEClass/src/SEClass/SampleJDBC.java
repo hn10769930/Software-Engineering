@@ -1,5 +1,6 @@
 package SEClass;
 
+
 import java.sql.*;
 import java.util.Scanner;
 
@@ -8,7 +9,7 @@ public class SampleJDBC {
         // Database connection details
         String url = "jdbc:mysql://localhost:3306/school";
         String user = "root";
-        String password = "521Annadale!";
+        String password = "password";
         String driverClass = "com.mysql.cj.jdbc.Driver"; 
 
         Connection connection = null;
@@ -30,7 +31,9 @@ public class SampleJDBC {
             switch (choice) {
                 case 1: tableName = "patients"; break;
                 case 2: tableName = "procedures"; break;  
-                case 3: tableName = "new_events"; break; 
+                case 3: tableName = "events"; 
+                System.out.println("Remember: For patient confidentiality, events are not directly linked to patients or procedure!\nYou'll have to go to the patient and check their events individually.\n");
+                break; 
                 default: 
                     System.out.println("Invalid selection. Defaulting to 'procedures'.");
                     tableName = "procedures";
@@ -49,21 +52,17 @@ public class SampleJDBC {
             ResultSetMetaData metaData = resultSet.getMetaData();
             int columnCount = metaData.getColumnCount();
             
-            for (int i = 1; i <= columnCount; i++) {
-                System.out.print(metaData.getColumnName(i) + "\t");
+            
+        	for (int i = 1; i <= columnCount; i++) {
+    			System.out.print(metaData.getColumnName(i) + "\t");
+    		}
+        	System.out.println();
+            while (resultSet.next()) {
+                String[] patient_info = sql_entry_to_string_array(resultSet);
+                format_and_print_entry(tableName, patient_info);
+                System.out.println();
             }
 
-            while (resultSet.next()) {
-                //Iterate through the columns for the current row
-                for (int i = 1; i <= columnCount; i++) {
-                    // getString(i) gets the value at index i (1-based index)
-                    // We use "\t" (tab) to separate columns visually
-                		if (i==1) System.out.println();
-                    String value = resultSet.getString(i);
-                    System.out.print(value + "\t");
-                }
-                System.out.println(); 
-            }
         } catch (ClassNotFoundException e) {
             System.err.println("Error loading the JDBC driver: " + e.getMessage());
             e.printStackTrace();
@@ -83,4 +82,50 @@ public class SampleJDBC {
             }
         }
     }
+    
+    public static String[] sql_entry_to_string_array(ResultSet sql_entries) {
+    	try {
+    	//Get Metadata to understand the table structure
+        ResultSetMetaData metaData = sql_entries.getMetaData();
+        int columnCount = metaData.getColumnCount();
+    	String[] entries = new String[columnCount];
+    	for (int i = 1; i <= columnCount; i++) {
+            entries[i-1]= sql_entries.getString(i);
+        }
+    	
+		return entries;
+    	}
+    	catch(SQLException e) {
+    		System.err.println("Database error: " + e.getMessage());
+    		return null;
+    	}
+		}
+    
+    public static void format_and_print_entry(String table_name, String[] entries) {
+    	if (table_name == "patients") {
+        	//Last Name	First Name	Pronoun	DOB	Address	City	State	Zip	
+        	//Insurance provider	Insurance ID	Sex	Gender	Doctor	MRN
+    		String patient_name_and_pronouns = entries[1] + " " + entries[0] + " (" + entries[2] + ")";
+    		System.out.println(patient_name_and_pronouns);
+    		System.out.println("Born: " + entries[3]);
+    		System.out.println("Address: " + entries[4] + ", " + entries[5] + " " + entries[6]);
+    		System.out.println("Insurance Provider: " + entries[7] + "\n\tID Number: " + entries[8]);
+    		System.out.println("Overseen by " + entries[11]);
+    	}
+    	if (table_name == "procedures") {
+    		//Name	Procedure ID	Base Cost	Category
+    		System.out.println(entries[0] + "\n\tCost: " + entries[2] + "\n\t(" + entries[3] + ")");
+    	}
+    	if (table_name == "events") {
+    		//MRN	Proc. ID	Date	Time	Doctor	Paid?
+    		System.out.println("Date: " + entries[2] + "\t" + entries[3] + 
+    				"\n\tMRN: " + entries[0] + "\n\tProcedure ID: " + entries[1] + "\n\tDone by: " + entries[4]
+    				+ "\n\tPaid? " + entries[5]
+    				);
+    		
+    		
+    	}
+    }
 }
+
+
