@@ -8,7 +8,7 @@ public class SampleJDBC {
         // Database connection details
         String url = "jdbc:mysql://localhost:3306/school";
         String user = "root";
-        String password = "password";
+        String password = "521Annadale!";
         String driverClass = "com.mysql.cj.jdbc.Driver"; 
 
         Connection connection = null;
@@ -20,39 +20,55 @@ public class SampleJDBC {
             Class.forName(driverClass);
             connection = DriverManager.getConnection(url, user, password);
 
-            // --- NEW: User Selection Logic ---
-            System.out.println("Select an action:");
-            System.out.println("1. View Patients");
-            System.out.println("2. View Procedures"); 
-            System.out.println("3. View New Events"); 
-            // Add new patient option
-            System.out.println("4. Add New Patient"); 
-            System.out.print("Enter choice (1-4): ");
-            
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // Consume the leftover newline character
-            String tableName = "";
+            while(true) { // Added a loop so the program doesn't exit after one action
+                System.out.println("\n--- Main Menu ---");
+                System.out.println("1. View Patients");
+                System.out.println("2. View Procedures"); 
+                System.out.println("3. View Events"); 
+                System.out.println("4. Add New Patient"); 
+                System.out.println("5. Add Patient Event (Procedure)");
+                System.out.println("6. Exit");
+                System.out.print("Enter choice: ");
+                
+                int choice = 0;
+                try {
+                    choice = Integer.parseInt(scanner.nextLine());
+                } catch (NumberFormatException e) {
+                    System.out.println("Please enter a valid number.");
+                    continue;
+                }
 
-            switch (choice) {
-                case 1: 
-                    viewTable(connection, "patients"); break;
-                case 2: 
-                    viewTable(connection, "procedures"); break;  
-                case 3: 
-                    System.out.println("Remember: For patient confidentiality, events are not directly linked to patients or procedure!\nYou'll have to go to the patient and check their events individually.\n");
-                    viewTable(connection, "events"); break; 
-                case 4:
-                    addNewPatient(connection, scanner); break;
-                default: 
-                    System.out.println("Invalid selection.");
+                String tableName = "";
+
+                switch (choice) {
+                    case 1: 
+                        viewTable(connection, "patients");
+                        break;
+                    case 2: 
+                        viewTable(connection, "procedures");
+                        break;  
+                    case 3: 
+                        viewTable(connection, "events");
+                        break; 
+                    case 4:
+                        addNewPatient(connection, scanner);
+                        break;
+                    // *** NEW CASE ***
+                    case 5:
+                        addPatientEvent(connection, scanner);
+                        break;
+                    case 6:
+                        System.out.println("Exiting...");
+                        return; // Exits the main method
+                    default: 
+                        System.out.println("Invalid selection.");
+                }
             }
 
         } catch (ClassNotFoundException e) {
             System.err.println("Error loading the JDBC driver: " + e.getMessage());
-            e.printStackTrace();
         } catch (SQLException e) {
             System.err.println("Database error: " + e.getMessage());
-            e.printStackTrace();
         } finally {
             try {
                 if (resultSet != null) resultSet.close();
@@ -66,58 +82,120 @@ public class SampleJDBC {
         }
     }
     
-  
+    public static void addPatientEvent(Connection conn, Scanner scanner) throws SQLException {
+        System.out.println("\n--- Record a Patient Event ---");
+
+        // Validate MRN (Checking 'MRN' column in patients table)
+        String mrn = "";
+        boolean validMRN = false;
+        while (!validMRN) {
+            System.out.print("Enter Patient MRN: ");
+            mrn = scanner.nextLine();
+            
+            // Querying the `patients` table for MRN existence
+            String checkPatientSql = "SELECT MRN FROM patients WHERE MRN = ?";
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkPatientSql)) {
+                checkStmt.setString(1, mrn);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    validMRN = true;
+                    System.out.println("Patient found.");
+                } else {
+                    System.out.println("Error: MRN '" + mrn + "' not found in patients table. Please try again.");
+                }
+            }
+        }
+
+        // Validate Procedure ID (Checking `procedures` table)
+        String procID = "";
+        boolean validProc = false;
+        while (!validProc) {
+            System.out.print("Enter Procedure ID: ");
+            procID = scanner.nextLine();
+
+            String checkProcSql = "SELECT `Procedure ID` FROM procedures WHERE `Procedure ID` = ?";
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkProcSql)) {
+                checkStmt.setString(1, procID);
+                ResultSet rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    validProc = true;
+                    System.out.println("Procedure found.");
+                } else {
+                    System.out.println("Error: Procedure ID '" + procID + "' not found. Please try again.");
+                }
+            }
+        }
+
+        // Gather remaining data
+        System.out.print("Enter Date (DD/MM/YYYY): ");
+        String date = scanner.nextLine();
+
+        System.out.print("Enter Time (HH:MM): ");
+        String time = scanner.nextLine();
+
+        System.out.print("Enter Doctor's Last Name: ");
+        String docName = scanner.nextLine();
+        if (!docName.startsWith("Dr.")) {
+            docName = "Dr. " + docName;
+        }
+
+        System.out.print("Is this paid? (Yes/No): ");
+        String paidInput = scanner.nextLine();
+        String paidStatus = (paidInput.toLowerCase().startsWith("y")) ? "Yes" : "No";
+
+        String insertSql = "INSERT INTO events (`Patient`, `Procedure`, `Date`, `Time`, `Doctor`, `Paid`) VALUES (?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+            pstmt.setString(1, mrn);      // Value for `Patient` column
+            pstmt.setString(2, procID);   // Value for `Procedure` column
+            pstmt.setString(3, date);
+            pstmt.setString(4, time);
+            pstmt.setString(5, docName);
+            pstmt.setString(6, paidStatus);
+
+            int rows = pstmt.executeUpdate();
+            if (rows > 0) {
+                System.out.println("Event recorded successfully!");
+            }
+        }
+    }
+
     public static void addNewPatient(Connection conn, Scanner scanner) throws SQLException {
         System.out.println("\n--- Adding New Patient ---");
         
-        // Gather data
         System.out.print("First Name: ");
         String fName = scanner.nextLine();
-        
         System.out.print("Last Name: ");
         String lName = scanner.nextLine();
-        
         System.out.print("Pronouns (e.g. He/Him): ");
         String pronouns = scanner.nextLine();
-        
-        System.out.print("Date of Birth (D/M/YYYY): ");
+        System.out.print("Date of Birth (DD/MM/YYYY): ");
         String dob = scanner.nextLine();
-        
         System.out.print("Address: ");
         String address = scanner.nextLine();
-        
         System.out.print("City: ");
         String city = scanner.nextLine();
-        
         System.out.print("State: ");
         String state = scanner.nextLine();
-        
         System.out.print("Zip: ");
         String zip = scanner.nextLine();
-        
         System.out.print("Insurance Provider: ");
         String insProvider = scanner.nextLine();
-        
         System.out.print("Insurance ID: ");
         String insID = scanner.nextLine();
-        
         System.out.print("Sex: ");
         String sex = scanner.nextLine();
-        
         System.out.print("Gender: ");
         String gender = scanner.nextLine();
-        
         System.out.print("Doctor Name: ");
         String doctor = scanner.nextLine();
-        
         System.out.print("MRN (Medical Record Number): ");
         String mrn = scanner.nextLine();
 
-        //Prepare SQL
         String sql = "INSERT INTO patients (`Last Name`, `First Name`, `Pronoun`, `DOB`, `Address`, `City`, `State`, `Zip`, `Insurance provider`, `Insurance ID`, `Sex`, `Gender`, `Doctor`, `MRN`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-        		pstmt.setString(1, lName);
+            pstmt.setString(1, lName);
             pstmt.setString(2, fName);
             pstmt.setString(3, pronouns);
             pstmt.setString(4, dob);
@@ -139,10 +217,9 @@ public class SampleJDBC {
         }
     }
 
-    // Refactored the viewing logic into its own method to keep Main clean
     public static void viewTable(Connection connection, String tableName) throws SQLException {
         String query = "SELECT * FROM " + tableName;
-        System.out.println("Connected to the database. Querying table: " + tableName + "\n");
+        System.out.println("Querying table: " + tableName + "\n");
 
         Statement statement = connection.createStatement();
         ResultSet resultSet = statement.executeQuery(query);
@@ -164,14 +241,12 @@ public class SampleJDBC {
     
     public static String[] sql_entry_to_string_array(ResultSet sql_entries) {
         try {
-        	//Get Metadata to understand the table structure
             ResultSetMetaData metaData = sql_entries.getMetaData();
             int columnCount = metaData.getColumnCount();
             String[] entries = new String[columnCount];
             for (int i = 1; i <= columnCount; i++) {
                 entries[i-1]= sql_entries.getString(i);
             }
-            
             return entries;
         }
         catch(SQLException e) {
